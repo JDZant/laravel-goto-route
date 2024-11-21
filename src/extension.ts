@@ -174,51 +174,71 @@ class LaravelBladeRouteProvider implements vscode.DefinitionProvider {
 	}
 
 	private async findRouteDefinition(routeName: string): Promise<vscode.Location | undefined> {
-		// Search in route files
-		const routeFiles = await vscode.workspace.findFiles(
-			'routes/**/*.php',  // Search all PHP files in routes directory
-			'**/vendor/**'      // Exclude vendor directory
-		);
+		try {
+			vscode.window.showInformationMessage(`🔍 Looking for route: ${routeName}`);
 
-		vscode.window.showInformationMessage(`🔍 Searching in ${routeFiles.length} route files...`);
+			// Search in route files
+			const routeFiles = await vscode.workspace.findFiles(
+				'routes/**/*.php',
+				'**/vendor/**'
+			);
 
-		for (const file of routeFiles) {
-			vscode.window.showInformationMessage(`📄 Checking ${file.fsPath}`);
-			
-			const document = await vscode.workspace.openTextDocument(file);
-			const text = document.getText();
-
-			// Look for the route name definition
-			const routePattern = new RegExp(`->name\\(['"](${routeName})['"]\\)`);
-			const match = routePattern.exec(text);
-
-			if (match) {
-				vscode.window.showInformationMessage(`✅ Found route in ${file.fsPath}`);
+			for (const file of routeFiles) {
+				const document = await vscode.workspace.openTextDocument(file);
+				const text = document.getText();
 				
-				// Find the line number
-				const lines = text.split('\n');
-				let lineNumber = 0;
-				let currentPos = 0;
+				// First try exact match
+				const exactPattern = new RegExp(`->name\\(['"](${routeName})['"]\\)`);
+				const exactMatch = exactPattern.exec(text);
+				
+				if (exactMatch) {
+					vscode.window.showInformationMessage(`✅ Found exact route match in ${file.fsPath}`);
+					
+					// Find the line number
+					const lines = text.split('\n');
+					let lineNumber = 0;
+					let currentPos = 0;
 
-				for (let i = 0; i < lines.length; i++) {
-					if (currentPos + lines[i].length >= match.index) {
-						// Find the start of the route definition
-						let startLine = i;
-						while (startLine > 0 && !lines[startLine].trim().startsWith('Route::')) {
-							startLine--;
+					for (let i = 0; i < lines.length; i++) {
+						if (currentPos + lines[i].length >= exactMatch.index) {
+							// Find the start of the route definition
+							let startLine = i;
+							
+							// Look for Route:: or ->name
+							while (startLine > 0 && 
+								   !lines[startLine].trim().startsWith('Route::') && 
+								   !lines[startLine].includes('->name')) {
+								startLine--;
+							}
+
+							// Create a selection range
+							const range = new vscode.Range(
+								new vscode.Position(startLine, 0),
+								new vscode.Position(i, lines[i].length)
+							);
+
+							// Open the file and show the route
+							const uri = vscode.Uri.file(file.fsPath);
+							await vscode.window.showTextDocument(uri, {
+								selection: range,
+								preserveFocus: false,
+								preview: false
+							});
+
+							return new vscode.Location(uri, range);
 						}
-
-						return new vscode.Location(
-							file,
-							new vscode.Position(startLine, 0)
-						);
+						currentPos += lines[i].length + 1;
 					}
-					currentPos += lines[i].length + 1;
 				}
 			}
-		}
 
-		return undefined;
+			vscode.window.showErrorMessage(`❌ Route '${routeName}' not found in route files`);
+			return undefined;
+
+		} catch (error: any) {
+			vscode.window.showErrorMessage(`🐛 Error: ${error.message}`);
+			return undefined;
+		}
 	}
 }
 
