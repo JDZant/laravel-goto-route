@@ -146,27 +146,24 @@ class LaravelBladeRouteProvider implements vscode.DefinitionProvider {
 	}
 
 	private getFullRouteName(line: string, clickedWord: string, position: vscode.Position): string | null {
-		// Look for route calls that contain the clicked word
-		const routePattern = /route\(['"]([\w\-\.]+)['"](?:\s*,\s*.*?)?\)/g;
-		const matches = Array.from(line.matchAll(routePattern));
+		const patterns = [
+			/route\(['"]([a-zA-Z0-9\-\._]+)['"](?:\s*,\s*.*?)?\)/g,
+			/\{\{\s*route\(['"]([a-zA-Z0-9\-\._]+)['"](?:\s*,\s*.*?)?\)\s*\}\}/g
+		];
 
-		for (const match of matches) {
-			const [fullMatch, routeName] = match;
-			if (routeName.includes(clickedWord)) {
-				vscode.window.showInformationMessage(`✅ Found route: ${routeName}`);
-				return routeName;
-			}
-		}
-
-		// Try blade syntax
-		const bladePattern = /\{\{\s*route\(['"]([\w\-\.]+)['"](?:\s*,\s*.*?)?\)\s*\}\}/g;
-		const bladeMatches = Array.from(line.matchAll(bladePattern));
-
-		for (const match of bladeMatches) {
-			const [fullMatch, routeName] = match;
-			if (routeName.includes(clickedWord)) {
-				vscode.window.showInformationMessage(`✅ Found route in blade syntax: ${routeName}`);
-				return routeName;
+		for (const pattern of patterns) {
+			const matches = Array.from(line.matchAll(pattern));
+			for (const match of matches) {
+				const [fullMatch, routeName] = match;
+				// Find the start position of the route name in the line
+				const startIndex = line.indexOf(routeName);
+				const endIndex = startIndex + routeName.length;
+				
+				// Check if the clicked position is within the route name
+				if (position.character >= startIndex && position.character <= endIndex) {
+					vscode.window.showInformationMessage(`✅ Found route: ${routeName}`);
+					return routeName;
+				}
 			}
 		}
 
@@ -175,64 +172,68 @@ class LaravelBladeRouteProvider implements vscode.DefinitionProvider {
 
 	private async findRouteDefinition(routeName: string): Promise<vscode.Location | undefined> {
 		try {
-			vscode.window.showInformationMessage(`🔍 Looking for route: ${routeName}`);
-
-			// Search in route files
 			const routeFiles = await vscode.workspace.findFiles(
 				'routes/**/*.php',
 				'**/vendor/**'
 			);
 
+			// Split the route name to handle grouped routes
+			const routeParts = routeName.split('.');
+			
 			for (const file of routeFiles) {
 				const document = await vscode.workspace.openTextDocument(file);
 				const text = document.getText();
 				
-				// First try exact match
-				const exactPattern = new RegExp(`->name\\(['"](${routeName})['"]\\)`);
-				const exactMatch = exactPattern.exec(text);
-				
-				if (exactMatch) {
-					vscode.window.showInformationMessage(`✅ Found exact route match in ${file.fsPath}`);
-					
-					// Find the line number
-					const lines = text.split('\n');
-					let lineNumber = 0;
-					let currentPos = 0;
+				// Look for various route definition patterns
+				const patterns = [
+					// Standard name definition
+					new RegExp(`->name\\(['"]${routeName}['"]\\)`, 'm'),
+					// Group prefix definition
+					new RegExp(`['"]as['"]\\s*=>\\s*['"]${routeParts[0]}\\.${routeParts[1]}\\.['"]`, 'm'),
+					// Route definition with the last part of the route name
+					new RegExp(`Route::(?:get|post|put|patch|delete)\\(['"]/?${routeParts[routeParts.length - 1]}['"]`, 'm')
+				];
 
-					for (let i = 0; i < lines.length; i++) {
-						if (currentPos + lines[i].length >= exactMatch.index) {
-							// Find the start of the route definition
-							let startLine = i;
-							
-							// Look for Route:: or ->name
-							while (startLine > 0 && 
-								   !lines[startLine].trim().startsWith('Route::') && 
-								   !lines[startLine].includes('->name')) {
-								startLine--;
+				for (const pattern of patterns) {
+					const match = pattern.exec(text);
+					if (match) {
+						// Find the line number
+						const lines = text.split('\n');
+						let lineNumber = 0;
+						let currentPos = 0;
+
+						for (let i = 0; i < lines.length; i++) {
+							if (currentPos + lines[i].length >= match.index) {
+								// Look backwards to find the start of the route definition or group
+								let startLine = i;
+								while (startLine > 0 && 
+									   !lines[startLine].trim().startsWith('Route::') && 
+									   !lines[startLine].includes('->name') &&
+									   !lines[startLine].includes("'as' =>")) {
+									startLine--;
+								}
+
+								const range = new vscode.Range(
+									new vscode.Position(startLine, 0),
+									new vscode.Position(i, lines[i].length)
+								);
+
+								const uri = vscode.Uri.file(file.fsPath);
+								await vscode.window.showTextDocument(uri, {
+									selection: range,
+									preserveFocus: false,
+									preview: false
+								});
+
+								return new vscode.Location(uri, range);
 							}
-
-							// Create a selection range
-							const range = new vscode.Range(
-								new vscode.Position(startLine, 0),
-								new vscode.Position(i, lines[i].length)
-							);
-
-							// Open the file and show the route
-							const uri = vscode.Uri.file(file.fsPath);
-							await vscode.window.showTextDocument(uri, {
-								selection: range,
-								preserveFocus: false,
-								preview: false
-							});
-
-							return new vscode.Location(uri, range);
+							currentPos += lines[i].length + 1;
 						}
-						currentPos += lines[i].length + 1;
 					}
 				}
 			}
 
-			vscode.window.showErrorMessage(`❌ Route '${routeName}' not found in route files`);
+			vscode.window.showWarningMessage(`❌ Route '${routeName}' not found in route files`);
 			return undefined;
 
 		} catch (error: any) {
