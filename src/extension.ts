@@ -131,8 +131,6 @@ class LaravelBladeRouteProvider implements vscode.DefinitionProvider {
 			return undefined;
 		}
 
-		vscode.window.showInformationMessage(`🎯 Found complete route name: ${routeName}`);
-
 		// Search in route files
 		const routeLocation = await this.findRouteDefinition(routeName);
 		if (!routeLocation) {
