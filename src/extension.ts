@@ -120,11 +120,9 @@ class LaravelBladeRouteProvider implements vscode.DefinitionProvider {
 	): Promise<vscode.Definition | undefined> {
 		// Get the line text
 		const lineText = document.lineAt(position.line).text;
-		vscode.window.showInformationMessage(`📝 Analyzing line: ${lineText}`);
 
 		// Get the word at position
 		const word = document.getText(document.getWordRangeAtPosition(position));
-		vscode.window.showInformationMessage(`🔤 Clicked on: ${word}`);
 
 		// Extract the full route name
 		const routeName = this.getFullRouteName(lineText, word, position);

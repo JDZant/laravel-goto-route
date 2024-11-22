@@ -1,53 +1,58 @@
 # Laravel Goto Route
 
-A Visual Studio Code extension that enables clicking through from Laravel routes to their corresponding controller files.
+A Visual Studio Code extension that enables clicking through Laravel route names to their definitions in your route files.
 
 ## Features
 
-* Click-through navigation from route definitions to controller files
-* Supports both modern and legacy Laravel route syntax:
-  * Modern: `Route::get('/users', [UserController::class, 'index'])`
-  * Legacy: `Route::get('users', 'UserController@index')`
-
-## Requirements
-
-* Visual Studio Code 1.60.0 or newer
-* PHP files with Laravel route definitions
+- Click through route names in Blade files to jump to their definitions
+- Supports:
+  - Standard route definitions (`->name('route.name')`)
+  - Route groups with prefixes
+  - Nested route groups
+  - Hyphenated route names
+- Works in both PHP and Blade files
 
 ## Usage
 
-1. Open a Laravel project in VSCode
-2. Open any route file (e.g., `routes/web.php` or `routes/api.php`)
-3. Click on any controller reference in a route definition
-4. The extension will navigate you to the corresponding controller file
+Place your cursor on any route name in a `route()` helper and click through with `Ctrl+Click` (Windows/Linux) or `Cmd+Click` (Mac).
 
-## Supported Route Patterns
+Examples:
 
-The extension recognizes these route definition patterns:
-* `Route::get('/path', [Controller::class, 'method'])`
-* `Route::post('/path', 'Controller@method')`
-* And other HTTP verbs (put, patch, delete, etc.)
+```blade
+<a href="{{ route('products.show') }}">
+<a href="{{ route('auth.settings.profile') }}">
+<a href="{{ route('blog.categories.create') }}">
+```
+
+## Requirements
+
+- Visual Studio Code 1.60.0 or higher
+- Laravel project with route files in the standard `routes/` directory
 
 ## Extension Settings
 
-This extension contributes no additional settings.
+This extension contributes the following settings:
+
+* `laravelGotoRoute.enabled`: Enable/disable the extension
 
 ## Known Issues
 
-* Currently navigates to the start of the controller file rather than the specific method
+Please report issues on the [GitHub repository](https://github.com/JDZant/laravel-goto-route/issues).
 
 ## Release Notes
 
 ### 1.0.0
 
-Initial release of Laravel Goto Route
-* Basic route-to-controller navigation
-* Support for common Laravel route patterns
+Initial release:
+- Basic route navigation
+- Support for grouped routes
+- Support for hyphenated route names
 
-## Contributing
+## Publisher
 
-The source code for this extension is available on GitHub. Contributions are welcome!
+JDZant
 
 ## License
 
-This extension is licensed under the MIT License.
+This extension is licensed under the [MIT License](LICENSE) ([https://opensource.org/license/mit](https://opensource.org/license/mit)).
+
