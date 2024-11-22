@@ -18,9 +18,11 @@ Place your cursor on any route name in a `route()` helper and click through with
 
 Examples:
 
+```blade
 <a href="{{ route('products.show') }}">
 <a href="{{ route('auth.settings.profile') }}">
 <a href="{{ route('blog.categories.create') }}">
+```
 
 ## Requirements
 
