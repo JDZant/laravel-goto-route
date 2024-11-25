@@ -12,6 +12,25 @@ export function activate(context: vscode.ExtensionContext) {
 		vscode.window.showInformationMessage('Laravel Goto Route Test Command Executed!');
 	});
 
+	// Add the command handler
+	let gotoRouteCommand = vscode.commands.registerCommand('laravel-goto-route.gotoRoute', async ({ routeName }) => {
+		try {
+			const routeProvider = new LaravelBladeRouteProvider();
+			const location = await routeProvider.findRouteDefinition(routeName);
+			
+			if (location) {
+				await vscode.window.showTextDocument(location.uri, {
+					selection: location.range,
+					preserveFocus: false,
+					preview: false
+				});
+			}
+		} catch (error) {
+			console.error('Error executing goto command:', error);
+			vscode.window.showErrorMessage('Failed to open route definition');
+		}
+	});
+
 	// Register providers for both PHP and Blade files
 	let phpProvider = vscode.languages.registerDefinitionProvider(
 		{ scheme: 'file', language: 'php' },
@@ -23,7 +42,33 @@ export function activate(context: vscode.ExtensionContext) {
 		new LaravelBladeRouteProvider()
 	);
 
-	context.subscriptions.push(testCommand, phpProvider, bladeProvider);
+	// Add hover provider for both PHP and Blade files
+	let hoverProvider = vscode.languages.registerHoverProvider(
+		[
+			{ scheme: 'file', language: 'php' },
+			{ scheme: 'file', pattern: '**/*.blade.php' }
+		],
+		{
+			provideHover(document, position, token) {
+				const lineText = document.lineAt(position.line).text;
+				const routeName = new LaravelBladeRouteProvider().getFullRouteName(lineText, position);
+				
+				if (routeName) {
+					const commandUri = vscode.Uri.parse(
+						`command:laravel-goto-route.gotoRoute?${encodeURIComponent(JSON.stringify({ routeName }))}`
+					);
+					const contents = new vscode.MarkdownString(
+						`[Go to route definition](${commandUri})\n\nRoute: \`${routeName}\``
+					);
+					contents.isTrusted = true;
+					return new vscode.Hover(contents);
+				}
+				return null;
+			}
+		}
+	);
+
+	context.subscriptions.push(testCommand, phpProvider, bladeProvider, hoverProvider, gotoRouteCommand);
 	
 	vscode.window.showInformationMessage('🚀 Laravel Goto Route: Extension is now active!');
 }
@@ -143,7 +188,7 @@ class LaravelBladeRouteProvider implements vscode.DefinitionProvider {
 		return routeLocation;
 	}
 
-	private async findRouteDefinition(routeName: string): Promise<vscode.Location | undefined> {
+	public async findRouteDefinition(routeName: string): Promise<vscode.Location | undefined> {
 		try {
 			console.log('Searching for route:', routeName);
 			
@@ -233,7 +278,7 @@ class LaravelBladeRouteProvider implements vscode.DefinitionProvider {
 		}
 	}
 
-	private getFullRouteName(line: string, position: vscode.Position): string | null {
+	public getFullRouteName(line: string, position: vscode.Position): string | null {
 		const patterns = [
 			/route\(['"]([a-zA-Z0-9\-\._]+)['"](?:\s*,\s*.*?)?\)/g,
 			/\{\{\s*route\(['"]([a-zA-Z0-9\-\._]+)['"](?:\s*,\s*.*?)?\)\s*\}\}/g
